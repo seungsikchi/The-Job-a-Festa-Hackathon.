@@ -1,1 +1,1 @@
-# The-Job-a-Festa-Hackathon.
+# The-Job-a-Festa-Hackathon
