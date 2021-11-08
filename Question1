@@ -1,0 +1,137 @@
+"""
+문제1번 튜닝
+
+# 대형 운송수단 연료유량 예측모델 개발
+다양한 센서 정보를 활용한 대형 운송수단의 연료 유량 예측 모델 개발
+
+마지막 target은 연료 유량을 나타낸다
+
+결측치는 없음
+"""
+
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+import math
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import confusion_matrix
+from sklearn.model_selection import train_test_split
+
+from sklearn.preprocessing import StandardScaler
+import seaborn as sns
+import scipy as sp
+import scipy.stats
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import mean_squared_error
+from sklearn.decomposition import PCA
+from keras.callbacks import ModelCheckpoint, EarlyStopping
+
+
+import tensorflow as tf
+
+pd.set_option('display.max_row', 100000)
+pd.set_option('display.max_columns', 100000)
+
+"""## 데이터 확인해보기"""
+
+train = pd.read_csv('/content/train.csv')
+test = pd.read_csv('/content/test.csv')
+output_sample = pd.read_csv('/content/output_sample.csv')
+
+print(train.info())
+print(train.describe())
+
+#sns.pairplot(train[['feature_0', 'feature_1','feature_2','feature_3','feature_4', 'feature_5', 'feature_6', 'feature_7', 'feature_9', 'feature_10', 'feature_12', 'feature_13', 'feature_14']], diag_kind="kde")
+
+train_stats = train.describe()
+train_stats = train_stats.transpose()
+train_stats
+
+train_x = train[['feature_0', 'feature_1','feature_2','feature_3','feature_4', 'feature_5', 'feature_6', 'feature_7', 'feature_9', 'feature_10', 'feature_12', 'feature_13', 'feature_14']]
+real_test_x = test[['feature_0', 'feature_1','feature_2','feature_3','feature_4', 'feature_5', 'feature_6', 'feature_7', 'feature_9', 'feature_10', 'feature_12', 'feature_13', 'feature_14']]
+train_y = train[['target']]
+
+print(train_x.head(20))
+print(train_y.max())
+print(train_y.min())
+
+#모델 생성 및 적용
+pca = PCA()
+pca.fit(train_x)
+
+#PC score 구하기
+pca.transform(train_x)
+
+# print(train_x.head(20))
+
+#MinMax 정규화 사용
+
+scaler_x=MinMaxScaler()
+scaler_x.fit(train_x)
+Normalization_data_x=scaler_x.transform(train_x) -0.5
+
+train_xMM = pd.DataFrame(data=Normalization_data_x)
+
+scaler_y=MinMaxScaler()
+scaler_y.fit(train_y)
+train_Normalization_data_y=scaler_y.transform(train_y) -0.5
+
+train_yMM = pd.DataFrame(data=train_Normalization_data_y)
+
+test_Normalization_data=scaler_x.transform(real_test_x) -0.5
+
+real_test_xMM = pd.DataFrame(data=test_Normalization_data)
+
+train_xMM.head(5)
+
+print(train_Normalization_data_y.shape)
+print(train_y.shape)
+
+train_x, test_x, train_y, test_y = train_test_split(train_xMM, train_yMM, test_size = 0.2, random_state=0, shuffle = True)
+
+PC_ratio = pca.explained_variance_ratio_
+PC_ratio_df = pd.DataFrame(PC_ratio)
+PC_ratio_df.plot(kind='bar', logy= True)
+
+print(train_x.shape)
+print(train_y.shape)
+
+print(test_x.shape)
+print(test_y.shape)
+
+#다중 선형회귀 사용
+
+model = tf.keras.Sequential([
+    tf.keras.layers.Dense(128, activation = 'tanh', input_shape = (train_x.shape)),
+    tf.keras.layers.Dense(64, activation = "tanh"),
+    tf.keras.layers.Dense(32, activation = "tanh"),
+    tf.keras.layers.Dense(1)
+])
+
+optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001)
+
+model.compile(optimizer = optimizer, loss = 'mse', metrics = [tf.keras.metrics.RootMeanSquaredError()]) #손실함수 RMSE와 활성화함수 adam사용
+
+model.summary()
+
+early_stopping = EarlyStopping(monitor = 'val_root_mean_squared_error', min_delta = 0.00001, patience = 50, verbose =1, mode = 'auto', baseline = None, restore_best_weights = True)
+history = model.fit(train_x, train_y, epochs = 10000, validation_split = 0.25, batch_size = 8192 ,callbacks=(early_stopping))
+#pred_y = model.predict(test_x)
+
+plt.plot(history.history['loss'], 'b-', label = 'loss')
+plt.plot(history.history['val_loss'], 'r--', label = 'val_loss')
+plt.xlabel('Epoch')
+plt.legend()
+plt.show()
+
+test = model.predict(real_test_xMM)
+
+predict_data = scaler_y.inverse_transform(test + 0.5)
+print(predict_data)
+
+outputdf = pd.DataFrame(predict_data, columns=['target'])
+print(outputdf)
+outputdf.to_csv('/content/output_sample.csv', index=False)
+print(1)
+
