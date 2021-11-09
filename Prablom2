@@ -1,0 +1,182 @@
+# 물질의 임계온도 예측 모델 개발
+주최 : 과학기술정보통신부, 정보통신산업진흥원
+
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+import numpy.linalg as lin
+import random
+import math
+import tensorflow as tf
+import seaborn as sns
+import scipy as sp
+import scipy.stats
+import keras
+import sklearn
+import missingno as msno
+import warnings
+
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import confusion_matrix
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.metrics import mean_squared_error
+from sklearn.decomposition import PCA
+from keras.callbacks import ModelCheckpoint, EarlyStopping
+
+warnings.filterwarnings('ignore') # 워닝 메세지를 생략해 줍니다.
+pd.set_option('display.max_row', 100000)
+pd.set_option('display.max_columns', 100000)
+
+df = pd.read_csv('./data/2/train.csv')
+print(df)
+print(df.shape)
+
+df.info()
+
+# Commented out IPython magic to ensure Python compatibility.
+plt.style.use('seaborn')
+sns.set(font_scale=2.5)
+# %matplotlib inline
+
+df_train = pd.read_csv('./data/2/train.csv')
+df_test = pd.read_csv('./data/2/test.csv')
+output_sample = pd.read_csv('./data/2/output_sample.csv')
+
+# drop = [80]
+
+# print(df_train.head(5))
+
+# for i in drop:
+#  df_train = df_train.drop("feature_%d"%(i), axis = 1)
+#  print(i)
+#  df_test = df_test.drop("feature_%d"%(i), axis = 1)
+
+
+# 1.1 결측치(Null Data) 확인
+# df_train.isnull().sum() / df_train.shape[0]
+
+# df_test.isnull().sum() / df_test.shape[0]
+
+# df_train.head(5)
+# df_test.head(5)
+
+# 데이터 세트 분리하기(train, test)
+
+df_train['feature_0'] = df_train['feature_0'].astype('float64')
+df_train['feature_27'] = df_train['feature_27'].astype('float64')
+df_train['feature_77'] = df_train['feature_77'].astype('float64')
+
+df_test['feature_0'] = df_test['feature_0'].astype('float64')
+df_test['feature_27'] = df_test['feature_27'].astype('float64')
+df_test['feature_77'] = df_test['feature_77'].astype('float64')
+
+X = df_train.iloc[:, 0:-1]
+y = df_train.iloc[:, [-1]]
+
+print(X.shape)
+print(y.shape)
+print(df_test.shape)
+
+# 데이터 형변환
+
+# int를 float타입으로 바꿈
+# df_train['feature_0'] = df_train['feature_0'].apply(lambda x: x.replace(',', '')).astype('float')
+df_train['feature_0'] = df_train['feature_0'].astype('float64')
+df_train['feature_27'] = df_train['feature_27'].astype('float64')
+df_train['feature_77'] = df_train['feature_77'].astype('float64')
+
+df_test['feature_0'] = df_test['feature_0'].astype('float64')
+df_test['feature_27'] = df_test['feature_27'].astype('float64')
+df_test['feature_77'] = df_test['feature_77'].astype('float64')
+
+# 데이터 전처리가 끝났으므로 csv 파일로 저장
+# df_train.to_csv("/content/train.csv", mode='w', index=False)
+# df_test.to_csv("/content/test.csv", mode='w', index=False)
+
+"""## PCA로 분류하기"""
+
+print(X.head(20))
+
+#모델 생성 및 적용
+pca = PCA()
+pca.fit(X)
+pca.transform(X)
+
+print(X.head(20))
+
+# 데이터 정규화 MinMax정규화에서 0.5만큼 변환했음 ->  중간으로 더 수렴함
+
+scaler_x=MinMaxScaler()
+scaler_x.fit(X)
+Normalization_data_x=scaler_x.transform(X)
+
+train_xMM = pd.DataFrame(data=Normalization_data_x)
+
+scaler_y=MinMaxScaler()
+scaler_y.fit(y)
+train_Normalization_data_y=scaler_y.transform(y)
+
+train_yMM = pd.DataFrame(data=train_Normalization_data_y)
+
+test_Normalization_data=scaler_x.transform(df_test)
+
+real_test_xMM = pd.DataFrame(data=test_Normalization_data)
+
+print(train_Normalization_data_y.shape)
+print(y.shape)
+
+
+train_x, test_x, train_y, test_y = train_test_split(train_xMM, train_yMM, test_size = 0.2, random_state=0, shuffle = True)
+
+print(train_x.shape)
+print(train_y.shape)
+
+print(test_x.shape)
+print(test_y.shape)
+
+# 선형 회귀
+# 256 -> 128 -> 64 -> 8 -> 1로 줄어듬
+
+# model = tf.keras.Sequential([
+#     tf.keras.layers.Dense(256, activation = 'tanh', input_shape = (train_x.shape)),
+#     tf.keras.layers.Dense(128, activation = "tanh"),
+#     tf.keras.layers.Dense(64, activation = "tanh"),
+#     tf.keras.layers.Dense(8, activation = "elu"),
+#     tf.keras.layers.Dense(1)
+# ])
+model = tf.keras.Sequential([
+    tf.keras.layers.Dense(1024, activation = 'tanh', input_shape = (train_x.shape)),
+    tf.keras.layers.Dense(500, activation = "tanh"),
+    tf.keras.layers.Dense(250, activation = "tanh"),
+    tf.keras.layers.Dense(180, activation = "tanh"),
+    tf.keras.layers.Dense(50, activation = "tanh"),
+    tf.keras.layers.Dense(4, activation = "elu"),
+    tf.keras.layers.Dense(1)
+])
+
+optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001)
+
+model.compile(optimizer = optimizer, loss = 'mse', metrics = [tf.keras.metrics.MeanAbsoluteError()])
+
+model.summary()
+
+
+early_stopping = EarlyStopping(monitor = 'val_mean_absolute_error', min_delta = 0.00001, patience = 50, verbose =1, mode = 'auto', baseline = None, restore_best_weights = True)
+history = model.fit(train_x, train_y, epochs = 10000, validation_split = 0.25, batch_size = 32 ,callbacks=(early_stopping))
+
+
+# 결과를 출력하는 부분
+
+test = model.predict(real_test_xMM)
+
+predict_data = scaler_y.inverse_transform(test)
+print(predict_data)
+
+outputdf = pd.DataFrame(predict_data, columns=['target'])
+print(outputdf)
+outputdf.to_csv('./data/2/output_sample.csv', index=False)
+print(1)
+
