@@ -36,7 +36,6 @@ print(df.shape)
 
 df.info()
 
-# Commented out IPython magic to ensure Python compatibility.
 plt.style.use('seaborn')
 sns.set(font_scale=2.5)
 # %matplotlib inline
@@ -49,6 +48,7 @@ output_sample = pd.read_csv('./data/2/output_sample.csv')
 
 # print(df_train.head(5))
 
+# 자료중에 필요없는 파일을 드랍시키는 부분 한번 실행시키면 그 뒤에는 
 # for i in drop:
 #  df_train = df_train.drop("feature_%d"%(i), axis = 1)
 #  print(i)
@@ -96,18 +96,15 @@ df_test['feature_77'] = df_test['feature_77'].astype('float64')
 # df_train.to_csv("/content/train.csv", mode='w', index=False)
 # df_test.to_csv("/content/test.csv", mode='w', index=False)
 
-"""## PCA로 분류하기"""
+# PCA로 분류하기
 
-print(X.head(20))
-
-#모델 생성 및 적용
 pca = PCA()
 pca.fit(X)
 pca.transform(X)
 
 print(X.head(20))
 
-# 데이터 정규화 MinMax정규화에서 0.5만큼 변환했음 ->  중간으로 더 수렴함
+# MinMax정규화 = 최대값과 최소값을 구해서 범위를 0 ~ 1로 수렴시켜 학습이 더 잘되도록 수정
 
 scaler_x=MinMaxScaler()
 scaler_x.fit(X)
@@ -138,15 +135,8 @@ print(test_x.shape)
 print(test_y.shape)
 
 # 선형 회귀
-# 256 -> 128 -> 64 -> 8 -> 1로 줄어듬
+# 1024 -> 500 -> 250 -> 180 -> 50 -> 4 -> 1 로 줄어듬
 
-# model = tf.keras.Sequential([
-#     tf.keras.layers.Dense(256, activation = 'tanh', input_shape = (train_x.shape)),
-#     tf.keras.layers.Dense(128, activation = "tanh"),
-#     tf.keras.layers.Dense(64, activation = "tanh"),
-#     tf.keras.layers.Dense(8, activation = "elu"),
-#     tf.keras.layers.Dense(1)
-# ])
 model = tf.keras.Sequential([
     tf.keras.layers.Dense(1024, activation = 'tanh', input_shape = (train_x.shape)),
     tf.keras.layers.Dense(500, activation = "tanh"),
@@ -168,7 +158,7 @@ early_stopping = EarlyStopping(monitor = 'val_mean_absolute_error', min_delta = 
 history = model.fit(train_x, train_y, epochs = 10000, validation_split = 0.25, batch_size = 32 ,callbacks=(early_stopping))
 
 
-# 결과를 출력하는 부분
+# 결과를 출력하고 파일을 
 
 test = model.predict(real_test_xMM)
 
@@ -178,5 +168,4 @@ print(predict_data)
 outputdf = pd.DataFrame(predict_data, columns=['target'])
 print(outputdf)
 outputdf.to_csv('./data/2/output_sample.csv', index=False)
-print(1)
 
